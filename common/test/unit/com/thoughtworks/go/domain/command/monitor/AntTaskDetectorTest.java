@@ -16,23 +16,21 @@
 
 package com.thoughtworks.go.domain.command.monitor;
 
-import org.junit.runner.RunWith;
 import org.junit.Before;
 import org.junit.Test;
-import org.jmock.integration.junit4.JMock;
-import org.jmock.Mockery;
-import org.jmock.Expectations;
+import org.mockito.Mock;
 
-@RunWith(JMock.class)
+import static org.mockito.Mockito.verify;
+import static org.mockito.MockitoAnnotations.initMocks;
+
 public class AntTaskDetectorTest {
-    private Mockery context;
+    @Mock
     private Reporter reporter;
     private AntTaskDetector detector;
 
     @Before
     public void setUp() {
-        context = new Mockery();
-        reporter = context.mock(Reporter.class);
+        initMocks(this);
         detector = new AntTaskDetector(reporter);
     }
     
@@ -41,10 +39,8 @@ public class AntTaskDetectorTest {
     }
 
     @Test public void shouldReportWhatTaskIsRunning() throws Exception {
-        context.checking(new Expectations(){{
-            one(reporter).reportStatusDetail("building [clean]");
-        }});
         detector.consumeLine("clean:");
+        verify(reporter).reportStatusDetail("building [clean]");
     }
 
     @Test public void shouldIgnoreWhenThereIsSpaces() throws Exception {

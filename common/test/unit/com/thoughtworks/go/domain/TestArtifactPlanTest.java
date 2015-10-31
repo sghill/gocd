@@ -31,6 +31,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.internal.verification.Times;
 
 import static org.hamcrest.Matchers.is;
@@ -40,16 +41,16 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(JMock.class)
 public class TestArtifactPlanTest {
+    @Mock
     private DefaultGoPublisher mockArtifactPublisher;
-    private final Mockery context = new ClassMockery();
     private File rootPath;
 
     @Before
     public void setup() throws IOException {
-        mockArtifactPublisher = mock(DefaultGoPublisher.class);
+        initMocks(this);
         rootPath = new File("target/test");
         rootPath.mkdirs();
     }

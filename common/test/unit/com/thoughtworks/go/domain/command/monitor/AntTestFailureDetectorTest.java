@@ -21,20 +21,23 @@ import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.integration.junit4.JMock;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.MockitoAnnotations.initMocks;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
-@RunWith(JMock.class)
 public class AntTestFailureDetectorTest {
-    private Mockery context;
+    @Mock
     private Reporter reporter;
     private AntTestFailureDetector detector;
 
     @Before
     public void setUp() {
-        context = new Mockery();
-        reporter = context.mock(Reporter.class);
+        initMocks(this);
         detector = new AntTestFailureDetector(reporter);
     }
     
@@ -89,13 +92,11 @@ public class AntTestFailureDetectorTest {
     }
 
     @Test public void shouldNotFailingtheBuildWhenTestsFail() throws Exception {
-        context.checking(new Expectations(){{
-            never(reporter).failing(null);
-        }});
         detector.consumeLine("[junit] Testsuite: com.thoughtworks.go.agent.service.SslInfrastructureServiceTest");
         detector.consumeLine("[junit] Tests run: 5, Failures: 6, Errors: 7, Time elapsed: 10.561 sec");
 
         assertThat(detector.getTotalTime(), is(10561L));
+        verify(reporter, never()).failing(null);
     }
 
     /*

@@ -17,17 +17,14 @@
 package com.thoughtworks.go.server;
 
 import com.thoughtworks.go.helpers.FileSystemUtils;
-import com.thoughtworks.go.util.ClassMockery;
 import com.thoughtworks.go.util.SubprocessLogger;
 import com.thoughtworks.go.util.SystemEnvironment;
 import com.thoughtworks.go.util.TestFileUtil;
 import com.thoughtworks.go.util.validators.Validation;
 import org.hamcrest.CoreMatchers;
-import org.jmock.Expectations;
-import org.jmock.Mockery;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.File;
@@ -38,54 +35,52 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.core.IsNot.not;
 import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.*;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(org.jmock.integration.junit4.JMock.class)
 public class GoServerTest {
-    Mockery context = new ClassMockery();
-    private SystemEnvironment systemEnvironment;
+    @Mock
+    private AppServer appServer;
+    @Mock
+    private SubprocessLogger subprocessLogger;
+    @Mock
+    private SystemEnvironment systemEnviornment;
+    @Mock
+    private Validation validation;
+    @Mock
+    private SSLSocketFactory sslSocketFactory;
 
     @Before
     public void setUp() throws Exception {
-        systemEnvironment = new SystemEnvironment();
-        systemEnvironment.set(SystemEnvironment.APP_SERVER, AppServerStub.class.getCanonicalName());
+        initMocks(this);
     }
 
     @Test
     public void shouldValidateOnServerStartup() throws Exception {
-
-        final SystemEnvironment systemEnvironment = context.mock(SystemEnvironment.class);
-        StubGoServer goServer = new StubGoServer(systemEnvironment, Validation.SUCCESS);
-        goServer.subprocessLogger = mock(SubprocessLogger.class);
         final File tmpFile = TestFileUtil.createTempFile("keystore.tmp");
+        given(systemEnviornment.getServerPort()).willReturn(9153);
+        given(systemEnviornment.getSslServerPort()).willReturn(9443);
+        given(systemEnviornment.keystore()).willReturn(tmpFile);
+        given(systemEnviornment.truststore()).willReturn(tmpFile);
+        given(systemEnviornment.agentkeystore()).willReturn(tmpFile);
         tmpFile.deleteOnExit();
+        StubGoServer goServer = new StubGoServer(systemEnviornment, Validation.SUCCESS);
+        goServer.subprocessLogger = subprocessLogger;
 
-        context.checking(new Expectations() {
-            {
-                allowing(systemEnvironment).getServerPort();
-                will(returnValue(9153));
-                allowing(systemEnvironment).getSslServerPort();
-                will(returnValue(9443));
-                allowing(systemEnvironment).keystore();
-                will(returnValue(tmpFile));
-                allowing(systemEnvironment).truststore();
-                will(returnValue(tmpFile));
-                allowing(systemEnvironment).agentkeystore();
-                will(returnValue(tmpFile));
-            }
-        });
         goServer.go();
+
         assertThat(goServer.wasStarted(), is(true));
     }
 
     @Test
     public void shouldRegisterSubprocessLoggerAsExit() throws Exception {
-        SystemEnvironment systemEnvironment = mock(SystemEnvironment.class);
-        Validation validation = mock(Validation.class);
-        when(validation.isSuccessful()).thenReturn(true);
-        StubGoServer goServer = new StubGoServer(systemEnvironment, validation);
-        goServer.subprocessLogger = mock(SubprocessLogger.class);
+        given(validation.isSuccessful()).willReturn(true);
+        StubGoServer goServer = new StubGoServer(systemEnviornment, validation);
+        goServer.subprocessLogger = subprocessLogger;
+
         goServer.go();
+
         verify(goServer.subprocessLogger).registerAsExitHook("Following processes were alive at shutdown: ");
     }
 
@@ -97,11 +92,11 @@ public class GoServerTest {
 
     @Test
     public void shouldNotStartServerIfValidationFails() throws Exception {
-        final SystemEnvironment systemEnvironment = context.mock(SystemEnvironment.class);
         Validation validation = new Validation().addError(new Exception("Server Port occupied"));
-        StubGoServer goServer = new StubGoServer(systemEnvironment, validation);
+        StubGoServer goServer = new StubGoServer(systemEnviornment, validation);
 
         goServer.go();
+
         assertThat(goServer.wasStarted(), is(false));
     }
 
@@ -130,17 +125,16 @@ public class GoServerTest {
 
     @Test
     public void shouldStopServerAndThrowExceptionWhenServerFailsToStartWithAnUnhandledException() throws Exception {
-        final AppServer server = mock(AppServer.class);
-        when(server.getUnavailableException()).thenReturn(new RuntimeException("Some unhandled server startup exception"));
+        given(appServer.getUnavailableException()).willReturn(new RuntimeException("Some unhandled server startup exception"));
 
         GoServer goServer = new GoServer(){
             @Override
             AppServer configureServer() throws Exception {
-                return server;
+                return appServer;
             }
         };
-        doNothing().when(server).start();
-        doNothing().when(server).stop();
+        doNothing().when(appServer).start();
+        doNothing().when(appServer).stop();
 
         try {
             goServer.startServer();
@@ -150,9 +144,9 @@ public class GoServerTest {
             assertThat(e.getCause().getMessage(), is("Some unhandled server startup exception"));
         }
 
-        verify(server).start();
-        verify(server).getUnavailableException();
-        verify(server).stop();
+        verify(appServer).start();
+        verify(appServer).getUnavailableException();
+        verify(appServer).stop();
     }
 
     @Test
@@ -167,8 +161,7 @@ public class GoServerTest {
         FileSystemUtils.createFile("addon-1.jar", oneAddonDirectory);
 
         File noAddonDirectory = createInAddonDir("no-addon-dir");
-        SSLSocketFactory sslSocketFactory = mock(SSLSocketFactory.class);
-        when(sslSocketFactory.getSupportedCipherSuites()).thenReturn(new String[0]);
+        given(sslSocketFactory.getSupportedCipherSuites()).willReturn(new String[0]);
 
 
         GoServer goServerWithMultipleAddons = new GoServer(setAddonsPathTo(addonsDirectory), sslSocketFactory);
@@ -211,10 +204,9 @@ public class GoServerTest {
     }
 
     private SystemEnvironment setAddonsPathTo(File path) {
-        SystemEnvironment systemEnvironment = mock(SystemEnvironment.class);
-        when(systemEnvironment.get(SystemEnvironment.APP_SERVER)).thenReturn(AppServerStub.class.getCanonicalName());
-        doReturn(path.getPath()).when(systemEnvironment).get(SystemEnvironment.ADDONS_PATH);
-        return systemEnvironment;
+        given(systemEnviornment.get(SystemEnvironment.APP_SERVER)).willReturn(AppServerStub.class.getCanonicalName());
+        doReturn(path.getPath()).when(systemEnviornment).get(SystemEnvironment.ADDONS_PATH);
+        return systemEnviornment;
     }
 
 

@@ -23,12 +23,9 @@ import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.i18n.Localizer;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.service.GoConfigService;
-import com.thoughtworks.go.util.ClassMockery;
-import org.jmock.Expectations;
-import org.jmock.integration.junit4.JMock;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.servlet.ModelAndView;
@@ -36,48 +33,39 @@ import org.springframework.web.servlet.ModelAndView;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(JMock.class)
 public class TabControllerTest {
-    private ClassMockery mock;
     private Localizer localizer;
+    @Mock
+    private GoConfigService service;
 
     @Before
     public void setup() {
-        mock = new ClassMockery();
+        initMocks(this);
     }
 
     @Test
     public void shouldReturnModelAndViewWhenPipelinesArePresent() throws IOException {
-        final GoConfigService service = mock.mock(GoConfigService.class);
-        mock.checking(new Expectations() {
-            {
-                one(service).isPipelineEmpty();
-                will(returnValue(false));
-            }
-        });
-
+        given(service.isPipelineEmpty()).willReturn(true);
         TabController controller = new TabController(service, localizer);
+
         ModelAndView modelAndView = controller.handleOldPipelineTab(new MockHttpServletRequest(),
                 new MockHttpServletResponse());
+
         assertThat(modelAndView.getViewName(), is(TabController.TAB_PLACEHOLDER));
     }
 
     @Test
     public void shouldReturnModelAndViewWithNoPipelinesAndNonAdminUser() throws IOException {
-        final GoConfigService service = mock.mock(GoConfigService.class);
-        mock.checking(new Expectations() {
-            {
-                one(service).isPipelineEmpty();
-                will(returnValue(true));
-                one(service).isAdministrator(CaseInsensitiveString.str(Username.ANONYMOUS.getUsername()));
-                will(returnValue(false));
-            }
-        });
-
+        given(service.isPipelineEmpty()).willReturn(true);
+        given(service.isAdministrator(CaseInsensitiveString.str(Username.ANONYMOUS.getUsername()))).willReturn(false);
         TabController controller = new TabController(service, localizer);
+
         ModelAndView modelAndView = controller.handleOldPipelineTab(new MockHttpServletRequest(),
                 new MockHttpServletResponse());
+
         assertThat(modelAndView.getViewName(), is(TabController.TAB_PLACEHOLDER));
     }
 
@@ -91,16 +79,8 @@ public class TabControllerTest {
 
     @Test
     public void shouldRedirectWhenNoPipelinesAndAdminUser() throws IOException {
-        final GoConfigService service = mock.mock(GoConfigService.class);
-        mock.checking(new Expectations() {
-            {
-                one(service).isPipelineEmpty();
-                will(returnValue(true));
-                one(service).isAdministrator(CaseInsensitiveString.str(Username.ANONYMOUS.getUsername()));
-                will(returnValue(true));
-            }
-        });
-
+        given(service.isPipelineEmpty()).willReturn(true);
+        given(service.isAdministrator(CaseInsensitiveString.str(Username.ANONYMOUS.getUsername()))).willReturn(true);
         TabController controller = new TabController(service, localizer);
         StubResponse response = new StubResponse();
         assertThat(controller.handleOldPipelineTab(new MockHttpServletRequest(), response), is(nullValue()));

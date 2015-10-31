@@ -22,18 +22,15 @@ import java.util.ArrayList;
 import com.thoughtworks.go.domain.JobIdentifier;
 import com.thoughtworks.go.server.service.ArtifactsDirHolder;
 import com.thoughtworks.go.server.web.ArtifactFolder;
-import com.thoughtworks.go.util.ClassMockery;
 import com.thoughtworks.go.util.FileUtil;
 import com.thoughtworks.go.util.TestFileUtil;
 import com.thoughtworks.go.util.ZipUtil;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
-import org.jmock.Expectations;
-import org.jmock.integration.junit4.JMock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
 import static com.thoughtworks.go.matchers.FileExistsMatcher.exists;
 import static org.hamcrest.Matchers.endsWith;
@@ -41,31 +38,27 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(JMock.class)
 public class ZipArtifactCacheTest {
     private static final JobIdentifier JOB_IDENTIFIER = new JobIdentifier("pipeline-name", "label-111", "stage-name", 1, "job-name", 666L);
     private static final String JOB_FOLDERS = "pipelines/pipeline-name/label-111/stage-name/1/job-name/666";
 
-    ClassMockery context = new ClassMockery();
-
     private ZipArtifactCache zipArtifactCache;
     private File folder;
     private ArtifactFolder artifactFolder;
+    @Mock
     private ArtifactsDirHolder artifactsDirHolder;
 
     @Before public void setUp() throws Exception {
+        initMocks(this);
         folder = TestFileUtil.createTempFolder("ZipArtifactCacheTest-" + System.currentTimeMillis());
         File artifact = new File(folder, JOB_FOLDERS);
         artifact.mkdirs();
         TestFileUtil.createTestFolder(artifact, "dir");
         TestFileUtil.createTestFile(artifact, "dir/file1");
-
-        artifactsDirHolder = context.mock(ArtifactsDirHolder.class);
-        context.checking(new Expectations() {{
-            allowing(artifactsDirHolder).getArtifactsDir();
-            will(returnValue(folder));
-        }});
+        given(artifactsDirHolder.getArtifactsDir()).willReturn(folder);
         zipArtifactCache = new ZipArtifactCache(this.artifactsDirHolder, new ZipUtil());
         artifactFolder = new ArtifactFolder(JOB_IDENTIFIER, new File(artifact, "dir"), "dir");
     }

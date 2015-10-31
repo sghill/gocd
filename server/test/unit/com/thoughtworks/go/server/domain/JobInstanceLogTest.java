@@ -32,26 +32,19 @@ import com.thoughtworks.go.util.FileUtil;
 import org.apache.commons.io.IOUtils;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNull.nullValue;
-import org.jmock.Mockery;
-import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.After;
 import static org.junit.Assert.assertThat;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
-@RunWith(org.jmock.integration.junit4.JMock.class)
 public class JobInstanceLogTest {
     private JobInstanceLog jobInstanceLog;
     private LogFile defaultLogFile;
-    private Mockery context;
     private File rootFolder;
     private SystemEnvironment env;
 
     @Before
     public void setUp() {
-        context = new Mockery();
-        context.setImposteriser(ClassImposteriser.INSTANCE);
         jobInstanceLog = new JobInstanceLog(null, new HashMap());
         defaultLogFile = new LogFile(new File("log20051209122103.xml"));
         rootFolder = new File("root");

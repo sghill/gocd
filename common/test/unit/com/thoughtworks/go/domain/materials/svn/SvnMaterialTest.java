@@ -34,7 +34,6 @@ import com.thoughtworks.go.domain.materials.TestSubprocessExecutionContext;
 import com.thoughtworks.go.helper.MaterialConfigsMother;
 import com.thoughtworks.go.helper.MaterialsMother;
 import com.thoughtworks.go.security.GoCipher;
-import com.thoughtworks.go.util.ClassMockery;
 import com.thoughtworks.go.util.JsonUtils;
 import com.thoughtworks.go.util.JsonValue;
 import com.thoughtworks.go.util.ReflectionUtil;
@@ -45,28 +44,26 @@ import com.thoughtworks.go.util.json.JsonMap;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.hamcrest.Matchers;
-import org.jmock.Expectations;
-import org.jmock.Mockery;
-import org.jmock.integration.junit4.JMock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
 import static com.thoughtworks.go.util.command.ProcessOutputStreamConsumer.inMemoryConsumer;
-import static java.lang.String.format;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(JMock.class)
 public class SvnMaterialTest {
-    private Mockery context = new ClassMockery();
+    @Mock
     private Subversion subversion;
 
     private SvnMaterial svnMaterial;
@@ -77,19 +74,11 @@ public class SvnMaterialTest {
 
     @Before
     public void setUp() {
-        subversion = context.mock(Subversion.class);
-        context.checking(new Expectations() {
-            {
-                allowing(subversion).getUrl();
-                will(returnValue(new UrlArgument(URL)));
-                allowing(subversion).getPassword();
-                will(returnValue(""));
-                allowing(subversion).getUserName();
-                will(returnValue(""));
-                allowing(subversion).isCheckExternals();
-                will(returnValue(false));
-            }
-        });
+        initMocks(this);
+        given(subversion.getUrl()).willReturn(new UrlArgument(URL));
+        given(subversion.getPassword()).willReturn("");
+        given(subversion.getUserName()).willReturn("");
+        given(subversion.isCheckExternals()).willReturn(false);
         svnMaterial = SvnMaterial.createSvnMaterialWithMock(subversion);
         svnMaterial.setUrl(URL);
     }
@@ -124,68 +113,45 @@ public class SvnMaterialTest {
     @Test
     public void shouldCheckoutWhenFolderDoesNotExist() {
         final File workingCopy = new File("xyz");
-        context.checking(new Expectations() {
-            {
-                one(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
-            }
-        });
         svnMaterial.updateTo(outputStreamConsumer, revision, workingCopy, new TestSubprocessExecutionContext());
+        verify(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
     }
 
     @Test
     public void shouldLogRepoInfoToConsoleOutWithOutFolder() throws Exception {
         final File workingCopy = new File("xyz");
-
-        context.checking(new Expectations() {
-            {
-                one(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
-            }
-        });
         svnMaterial.updateTo(outputStreamConsumer, revision, workingCopy, new TestSubprocessExecutionContext());
         String stdout = outputStreamConsumer.getStdOut();
         assertThat(stdout, containsString(
                 String.format("Start updating %s at revision %s from %s", "files", revision.getRevision(),
                         svnMaterial.getUrl())));
+        verify(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
     }
 
     @Test
     public void shouldCheckoutForInvalidSvnWorkingCopy() {
         final File workingCopy = createSvnWorkingCopy(false);
-        context.checking(new Expectations() {
-            {
-                one(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
-            }
-        });
         svnMaterial.updateTo(outputStreamConsumer, revision, workingCopy, new TestSubprocessExecutionContext());
         assertThat(workingCopy.exists(), is(false));
+        verify(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
     }
 
     @Test
     public void shouldCheckoutIfSvnRepositoryChanged() throws IOException {
         final File workingCopy = createSvnWorkingCopy(true);
-        context.checking(new Expectations() {
-            {
-                one(subversion).workingRepositoryUrl(workingCopy);
-                will(returnValue("new url"));
-                one(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
-            }
-        });
+        given(subversion.workingRepositoryUrl(workingCopy)).willReturn("new url");
         svnMaterial.updateTo(outputStreamConsumer, revision, workingCopy, new TestSubprocessExecutionContext());
         assertThat(workingCopy.exists(), is(false));
+        verify(subversion).checkoutTo(outputStreamConsumer, workingCopy, revision);
     }
 
     @Test
     public void shouldUpdateForValidSvnWorkingCopy() throws IOException {
         final File workingCopy = createSvnWorkingCopy(true);
-        context.checking(new Expectations() {
-            {
-                one(subversion).workingRepositoryUrl(workingCopy);
-                will(returnValue(URL));
-                one(subversion).cleanupAndRevert(outputStreamConsumer, workingCopy);
-                one(subversion).updateTo(outputStreamConsumer, workingCopy, revision);
-            }
-        });
+        given(subversion.workingRepositoryUrl(workingCopy)).willReturn(URL);
         svnMaterial.updateTo(outputStreamConsumer, revision, workingCopy, new TestSubprocessExecutionContext());
+        verify(subversion).cleanupAndRevert(outputStreamConsumer, workingCopy);
+        verify(subversion).updateTo(outputStreamConsumer, workingCopy, revision);
     }
 
     @Test

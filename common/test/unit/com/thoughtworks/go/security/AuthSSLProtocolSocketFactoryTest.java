@@ -23,47 +23,37 @@ import java.security.cert.CertificateException;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 
-import com.thoughtworks.go.util.ClassMockery;
 import com.thoughtworks.go.util.SystemEnvironment;
-import org.jmock.Expectations;
-import org.jmock.Mockery;
+import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNot.not;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.mock;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(org.jmock.integration.junit4.JMock.class)
 public class AuthSSLProtocolSocketFactoryTest {
+    @Mock
+    private AuthSSLKeyManagerFactory keyManagerFactory;
 
-    Mockery context = new ClassMockery();
+    @Before
+    public void setUp() {
+        initMocks(this);
+    }
 
     @Test
     public void shouldRecreateSslSessionIfInitialisedWithEmptyKeystore()
             throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
-
-        final AuthSSLKeyManagerFactory keyManagerFactory = context.mock(AuthSSLKeyManagerFactory.class);
-        context.checking(new Expectations() {
-            {
-                exactly(2).of(keyManagerFactory).keyManagers();
-                will(returnValue(null));
-            }
-        });
+        given(keyManagerFactory.keyManagers()).willReturn(null);
 
         AuthSSLProtocolSocketFactory factory = new AuthSSLProtocolSocketFactory(null, keyManagerFactory);
 
         // first time: create ssl context with empty keystore
         SSLContext oldSslContext = factory.getSSLContext();
 
-        context.checking(new Expectations() {
-            {
-                allowing(keyManagerFactory).keyManagers();
-                will(returnValue(new KeyManager[] { }));
-            }
-        });
-
+        given(keyManagerFactory.keyManagers()).willReturn(new KeyManager[]{});
         SSLContext newSslContext = factory.getSSLContext();
         assertThat(oldSslContext, not(newSslContext));
         assertThat(newSslContext.getProtocol(), is(new SystemEnvironment().get(SystemEnvironment.GO_SSL_TRANSPORT_PROTOCOL_TO_BE_USED_BY_AGENT)));

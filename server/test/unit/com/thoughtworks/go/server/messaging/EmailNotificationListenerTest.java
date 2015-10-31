@@ -16,58 +16,53 @@
 
 package com.thoughtworks.go.server.messaging;
 
-import com.thoughtworks.go.config.BasicCruiseConfig;
-import com.thoughtworks.go.config.CruiseConfig;
-import com.thoughtworks.go.config.GoSmtpMailSender;
-import com.thoughtworks.go.config.MailHost;
+import com.thoughtworks.go.config.*;
+import com.thoughtworks.go.domain.materials.ValidationBean;
 import com.thoughtworks.go.helper.GoConfigMother;
 import com.thoughtworks.go.server.service.GoConfigService;
-import com.thoughtworks.go.util.ClassMockery;
-import org.jmock.Expectations;
-import org.jmock.integration.junit4.JMock;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
-@RunWith(JMock.class)
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.MockitoAnnotations.initMocks;
+
 public class EmailNotificationListenerTest {
-    public ClassMockery context;
-    public GoConfigService goConfigService;
-    public EmailNotificationListener.GoMailSenderFactory goMailSenderFactory;
-    public EmailNotificationListener emailNotificationListener;
+    @Mock
+    private GoConfigService goConfigService;
+    @Mock
+    private EmailNotificationListener.GoMailSenderFactory goMailSenderFactory;
+    @Mock
+    private GoMailSender sender;
+    private EmailNotificationListener emailNotificationListener;
 
     @Before
     public void setUp() throws Exception {
-        context = new ClassMockery();
-        goConfigService = context.mock(GoConfigService.class);
-        goMailSenderFactory = context.mock(EmailNotificationListener.GoMailSenderFactory.class);
+        initMocks(this);
         emailNotificationListener = new EmailNotificationListener(goConfigService, goMailSenderFactory);
     }
 
     @Test
     public void shouldNotCreateMailSenderIfMailHostIsNotConfigured() {
-        context.checking(new Expectations() {
-            {
-                allowing(goConfigService).currentCruiseConfig();
-                will(returnValue(new BasicCruiseConfig()));
-            }
-        });
+        given(goConfigService.currentCruiseConfig()).willReturn(new BasicCruiseConfig());
         emailNotificationListener.onMessage(null);
+        verify(goMailSenderFactory, never()).createSender();
     }
 
     @Test
     public void shouldCreateMailSenderIfMailHostIsConfigured() {
         final MailHost mailHost = new MailHost("hostName", 1234, "user", "pass", true, true, "from", "admin@local.com");
         final CruiseConfig config = GoConfigMother.cruiseConfigWithMailHost(mailHost);
-        context.checking(new Expectations() {
-            {
-                allowing(goConfigService).currentCruiseConfig();
-                will(returnValue(config));
-                one(goMailSenderFactory).createSender();
-                will(returnValue(GoSmtpMailSender.createSender(mailHost)));
-            }
-        });
+        given(goConfigService.currentCruiseConfig()).willReturn(config);
+        given(goMailSenderFactory.createSender()).willReturn(sender);
+        given(sender.send(anyString(), anyString(), anyString())).willReturn(ValidationBean.valid());
+
         emailNotificationListener.onMessage(new SendEmailMessage("subject", "body", "to"));
+
+        verify(sender).send("subject", "body", "to");
     }
 
 }

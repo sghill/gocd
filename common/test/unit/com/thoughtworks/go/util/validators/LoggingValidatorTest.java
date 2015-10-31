@@ -18,68 +18,58 @@ package com.thoughtworks.go.util.validators;
 
 import java.io.File;
 
-import com.thoughtworks.go.util.ClassMockery;
 import com.thoughtworks.go.util.SystemEnvironment;
 import com.thoughtworks.go.util.TestFileUtil;
-import org.jmock.Expectations;
-import org.jmock.Mockery;
-import org.jmock.integration.junit4.JMock;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.mockito.Mock;
 
 import static com.thoughtworks.go.util.OperatingSystem.LINUX;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-@RunWith(JMock.class)
 public class LoggingValidatorTest {
-    private final Mockery context = new ClassMockery();
     private File log4jPropertiesFile;
+    @Mock
     private Validator log4jFileValidator;
+    @Mock
     private LogDirectory logDirectory;
+    @Mock
     private LoggingValidator.Log4jConfigReloader log4jConfigReloader;
+    @Mock
     private SystemEnvironment env;
 
     @Before
     public void setUp() throws Exception {
         log4jPropertiesFile = new File("log4j.properties");
-        log4jFileValidator = context.mock(Validator.class);
-        logDirectory = context.mock(LogDirectory.class);
-        log4jConfigReloader = context.mock(LoggingValidator.Log4jConfigReloader.class);
-        env = context.mock(SystemEnvironment.class);
+        initMocks(this);
     }
 
     @Test
     public void shouldValidateLog4jExistsAndUpdateLogFolder() throws Exception {
         final Validation validation = new Validation();
-        context.checking(new Expectations() { {
-            one(log4jFileValidator).validate(validation);
-            will(returnValue(validation));
+        given(log4jFileValidator.validate(validation)).willReturn(validation);
+        given(logDirectory.update(log4jPropertiesFile, validation)).willReturn(validation);
+        LoggingValidator loggingValidator = new LoggingValidator(log4jPropertiesFile, log4jFileValidator, logDirectory, log4jConfigReloader);
 
-            one(logDirectory).update(log4jPropertiesFile, validation);
-            will(returnValue(validation));
+        loggingValidator.validate(validation);
 
-            one(log4jConfigReloader).reload(log4jPropertiesFile);
-        } });
-
-        new LoggingValidator(log4jPropertiesFile, log4jFileValidator, logDirectory, log4jConfigReloader)
-                .validate(validation);
         assertThat(validation.isSuccessful(), is(true));
+        verify(log4jConfigReloader).reload(log4jPropertiesFile);
     }
 
     @Test
     public void shouldCreateObjectCorrectly() throws Exception {
         File tempFolder = TestFileUtil.createUniqueTempFolder("foo");
         final String path = tempFolder.getAbsolutePath();
+        given(env.getConfigDir()).willReturn(path);
+        given(env.getCurrentOperatingSystem()).willReturn(LINUX);
 
-        context.checking(new Expectations() { {
-            atLeast(1).of(env).getConfigDir();
-            will(returnValue(path));
-            one(env).getCurrentOperatingSystem();
-            will(returnValue(LINUX));
-        } });
         LoggingValidator validator = new LoggingValidator(env);
+
         assertThat(validator.getLog4jFile(), is(new File(tempFolder, "log4j.properties")));
         assertThat((FileValidator) validator.getLog4jPropertiesValidator(), is(FileValidator.configFile("log4j.properties", env)));
         assertThat(validator.getLogDirectory(), is(LogDirectory.fromEnvironment(LINUX)));
